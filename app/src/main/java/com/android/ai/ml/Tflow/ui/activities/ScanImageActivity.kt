@@ -57,6 +57,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +71,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.Font
@@ -84,6 +86,10 @@ import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import com.android.ai.ml.Tflow.R
 import com.android.ai.ml.Tflow.ui.theme.AIAndroidAppTheme
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.label.ImageLabel
+import com.google.mlkit.vision.label.ImageLabeling
+import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -264,8 +270,12 @@ class ScanImageActivity : ComponentActivity() {
                                         Spacer(modifier = Modifier.height(10.dp))
                                     }
                                 }
-                            }
-                            else {
+                            } else {
+
+                                var result by remember {
+                                    mutableStateOf<List<ImageLabel>?>(null)
+                                }
+
                                 Column(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -286,6 +296,33 @@ class ScanImageActivity : ComponentActivity() {
                                                 .clip(RoundedCornerShape(14.dp)),
                                             contentScale = ContentScale.Crop
                                         )
+                                    }
+
+                                    result?.let {
+                                        for (imageLabel in it) {
+                                            Text(text = imageLabel.text)
+                                        }
+                                    } ?: Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "No Result",
+                                            modifier = Modifier.fillMaxWidth(),
+                                            textAlign = TextAlign.Center,
+                                            fontSize = 24.sp,
+                                            fontWeight = FontWeight.W400,
+                                            fontFamily = FontFamily(Font(R.font.montserrat_regular)),
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
+                                }
+
+                                LaunchedEffect(key1 = true) {
+                                    imageBitmap?.let {
+                                        scanImage(it,0){
+                                            result = it
+                                        }
                                     }
                                 }
                             }
@@ -311,7 +348,6 @@ class ScanImageActivity : ComponentActivity() {
 
 
     fun Context.createImageFile(): File {
-        // Create an image file name
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
         val imageFileName = "JPEG_" + timeStamp + "_"
         return File.createTempFile(
@@ -319,5 +355,30 @@ class ScanImageActivity : ComponentActivity() {
             ".jpg", /* suffix */
             externalCacheDir /* directory */
         )
+    }
+
+
+    fun scanImage(bitmap: Bitmap, rotation: Int, onResult: (List<ImageLabel>?) -> Unit) {
+        try {
+            val imageOptions = ImageLabelerOptions.Builder()
+                .setConfidenceThreshold(0.5f)
+                .build()
+
+            val imageLabeling = ImageLabeling.getClient(imageOptions)
+            val inputImage = InputImage.fromBitmap(bitmap, rotation)
+            val process = imageLabeling.process(inputImage)
+            process.addOnSuccessListener {
+                if (it.isEmpty()) {
+                    onResult(null)
+                } else {
+                    onResult(it)
+                }
+            }.addOnFailureListener {
+                onResult(null)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onResult(null)
+        }
     }
 }
