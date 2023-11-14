@@ -109,7 +109,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Objects
 
-class ScanImageActivity : ComponentActivity() {
+class ObjectDetectionActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
